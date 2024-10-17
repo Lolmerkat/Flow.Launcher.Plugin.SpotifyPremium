@@ -339,16 +339,23 @@ namespace Flow.Launcher.Plugin.SpotifyPremium
             return SingleResultInList("Toggle Shuffle", $"Turn Shuffle {toggleAction}", action: _client.ToggleShuffle);
         }
 
-        private List<Result> AddLikeCurrentSong(string arg = null)
-        {
-            var currentSong = _client.CurrentPlaybackName;
-            return SingleResultInList("Like", $"Add '{currentSong}' to liked songs", action: _client.AddLikeCurrentSong);
-        }
-
         private List<Result> UnlikeCurrentSong(string arg = null)
         {
+            var currentlyPlayingContext = _client.PlaybackContext;
+            var currentlyPlayingItem = currentlyPlayingContext.Item;
+            var currentArtwork = currentlyPlayingItem switch
+            {
+                    FullTrack track => _client.GetArtworkAsync(track).GetAwaiter().GetResult(),
+                    FullEpisode episode => _client.GetArtworkAsync(episode).GetAwaiter().GetResult(),
+                    _ => SpotifyIcon
+            };
+
             var currentSong = _client.CurrentPlaybackName;
-            return SingleResultInList("Remove", $"Remove '{currentSong}' from liked songs", action: _client.UnlikeCurrentSong);
+            return SingleResultInList(
+                title: "Unlike",
+                subtitle: $"Remove '{currentSong}' from liked songs",
+                icoPath: currentArtwork,
+                action: _client.UnlikeCurrentSong);
         }
 
         private async Task<List<Result>> SearchAllAsync(string param)
@@ -498,13 +505,28 @@ namespace Flow.Launcher.Plugin.SpotifyPremium
             // Like/Unlike currently playing song if no {track} param is passed
             if (string.IsNullOrWhiteSpace(param))
             {
+                var currentlyPlayingContext = _client.PlaybackContext;
+                var currentlyPlayingItem = currentlyPlayingContext.Item;
+                var currentArtwork = currentlyPlayingItem switch
+                {
+                    FullTrack track => await _client.GetArtworkAsync(track),
+                    FullEpisode episode => await _client.GetArtworkAsync(episode),
+                    _ => SpotifyIcon
+                };
+
                 var currentSongName = _client.CurrentPlaybackName;
                 var currentSongId = _client.CurrentPlaybackId;
                 var currentSongIsLiked = _client.CheckLikedById(currentSongId);
                 var subtitle = currentSongIsLiked 
                     ? $"Remove '{currentSongName}' from liked songs" 
                     : $"Add '{currentSongName}' to liked songs";
-                return SingleResultInList("Like", subtitle, action: _client.ToggleLikeCurrentSong);
+
+                return SingleResultInList(
+                    title: "Like",
+                    subtitle: subtitle,
+                    icoPath: currentArtwork,
+                    action: _client.ToggleLikeCurrentSong
+                );
             }
 
             // Retrieve data and return the first 20 results
